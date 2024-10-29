@@ -5,7 +5,13 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/UIStartScreen.unity
+    guid: 454f87772cac60e459f844dff8bddff9
+  - enabled: 1
+    path: Assets/Scenes/Marc.unity
+    guid: 01073cc5262f1b6449d4890fd115ae9a
   m_configObjects: {}
