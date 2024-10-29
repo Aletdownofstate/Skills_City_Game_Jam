@@ -733,6 +733,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enemyDest: {fileID: 572580215}
   enemy: {fileID: 1345861689}
+  maxHealth: 1
 --- !u!195 &1345861695
 NavMeshAgent:
   m_ObjectHideFlags: 0
