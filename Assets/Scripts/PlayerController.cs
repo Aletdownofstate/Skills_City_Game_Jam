@@ -1,14 +1,20 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class PlayerController : MonoBehaviour
 {
     private Camera mainCamera;
     private Rigidbody rb;
     private Animator animator;
+    private PlayerHealth playerHealth;
+    private Ammo ammo;
 
-    [SerializeField] private AudioSource gunshotSound;
+    [SerializeField] private AudioSource gunshotSound, reloadSound;    
     [SerializeField] private Light muzzleFlash;
+    [SerializeField] private Slider staminaBar;
+
+    private bool canControl = true;
 
     private float moveHorizontal;
     private float moveVertical;
@@ -22,11 +28,21 @@ public class PlayerController : MonoBehaviour
     private bool canShoot = true;
     public float shootRange = 100f;
 
+    private int staminaMax = 100;
+    private int stamina;
+    private bool canDrainStamina = true;
+    private bool canRefillStamina = false;
+    private bool isStaminaDelayComplete = false;
+
     private void Start()
     {
         rb = gameObject.GetComponent<Rigidbody>();
         animator = gameObject.GetComponentInChildren<Animator>();
+        playerHealth = gameObject.GetComponent<PlayerHealth>();
+        ammo = gameObject.GetComponent<Ammo>();
         mainCamera = Camera.main;
+
+        stamina = staminaMax;
 
         isIdle = true;
         muzzleFlash.enabled = false;
@@ -34,48 +50,83 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        // Inputs
-        // Movement
-
-        moveHorizontal = Input.GetAxisRaw("Horizontal");
-        moveVertical = Input.GetAxisRaw("Vertical");
-        
-        // Running
-
-        if (Input.GetKey(KeyCode.LeftShift))
+        if (playerHealth.isDead)
         {
-            isRunning = true;
+            canControl = false;
         }
-        if (!Input.GetKey(KeyCode.LeftShift))
+        else
         {
-            isRunning = false;
-            moveSpeed = 4f;
+            canControl = true;
         }
 
-        // Aiming
-
-        if (Input.GetMouseButton(1) && !isRunning)
+        if (canControl)
         {
-            isAiming = true;
+            // Inputs
+            // Movement
+
+            moveHorizontal = Input.GetAxisRaw("Horizontal");
+            moveVertical = Input.GetAxisRaw("Vertical");
+
+            // Running
+
+            if (Input.GetKey(KeyCode.LeftShift) && stamina != 0)
+            {
+                isRunning = true;
+            }
+            if (!Input.GetKey(KeyCode.LeftShift))
+            {
+                isRunning = false;
+                moveSpeed = 4f;                
+            }
+
+            if (Input.GetKeyUp(KeyCode.LeftShift))
+            {
+                isStaminaDelayComplete = false;
+                StartCoroutine(StaminaRefillDelay());
+            }
+
+            // Aiming
+
+            if (Input.GetMouseButton(1) && !isRunning)
+            {
+                isAiming = true;
+            }
+            if (!Input.GetMouseButton(1) || isRunning)
+            {
+                isAiming = false;
+            }
+
+            // Shooting
+
+            if (ammo.currentClipSize == 0 || ammo.currentAmmo == 0)
+            {
+                canShoot = false;
+            }
+
+            if (Input.GetMouseButton(0) && isAiming && canShoot)
+            {
+                Shoot();
+                StartCoroutine(MuzzleFlashDelay());
+                gunshotSound.Play();
+                StartCoroutine(ShootDelay());
+            }
+
+            // Reloading
+
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                reloadSound.Play();
+                StartCoroutine(ReloadDelay());
+                int firedAmmo = ammo.maxClipSize - ammo.currentClipSize;
+                ammo.currentAmmo -= firedAmmo;
+                ammo.currentClipSize = ammo.maxClipSize;
+            }
+
+            RotateCharacterToMouse();
         }
-        if (!Input.GetMouseButton(1) || isRunning)
-        {
-            isAiming = false;
-        }
 
-        // Shooting
+        #region Animations
 
-        if (Input.GetMouseButton(0) && isAiming && canShoot)
-        {
-            Shoot();
-            StartCoroutine(MuzzleFlashDelay());
-            gunshotSound.Play();
-            StartCoroutine(ShootDelay());
-        }
-
-        RotateCharacterToMouse();       
-
-        // Movement animations
         // Idle
 
         if (moveHorizontal == 0 && moveVertical == 0)
@@ -97,7 +148,7 @@ public class PlayerController : MonoBehaviour
 
         // Running
 
-        if (isRunning && rb.velocity.x >= 0.01f || rb.velocity.y >= 0.01f)
+        if (isRunning && !isIdle && stamina != 0)
         {
             animator.SetBool("isRunning", true);
             animator.SetBool("isWalking", false);
@@ -130,7 +181,44 @@ public class PlayerController : MonoBehaviour
         {
             animator.SetBool("isMoveAiming", false);
         }
-    }    
+
+        // Death
+
+        if (playerHealth.isDead)
+        {
+            animator.SetBool("isIdle", false);
+            animator.SetBool("isWalking", false);
+            animator.SetBool("isRunning", false);
+            animator.SetBool("isIdleAiming", false);
+            animator.SetBool("isMoveAiming", false);
+
+            animator.SetBool("isDead", true);
+        }
+
+        #endregion
+
+        #region Stamina
+
+        staminaBar.value = stamina;
+
+        if (stamina == 0)
+        {            
+            moveSpeed = 4f;
+            isRunning = false;
+        }
+
+        if (isRunning && !isIdle && canDrainStamina)
+        {
+            StartCoroutine(DrainStamina());            
+        }
+
+        if (isStaminaDelayComplete)
+        {
+            StartCoroutine(RefillStamina());
+        }
+
+        #endregion
+    }
 
     private void FixedUpdate()
     {
@@ -164,6 +252,13 @@ public class PlayerController : MonoBehaviour
             EnemyAI enemy = hit.collider.GetComponentInChildren<EnemyAI>();
             enemy.TakeDamage(100);
         }
+
+        ammo.currentClipSize--;
+
+        if (!EnemyAI.isStalking)
+        {
+            EnemyAI.isStalking = true;
+        }
     }
 
     private IEnumerator ShootDelay()
@@ -179,5 +274,46 @@ public class PlayerController : MonoBehaviour
         yield return new WaitForSeconds(0.1f);
         muzzleFlash.enabled = false;
     }
+    
+    private IEnumerator DrainStamina()
+    {
+        stamina--;
 
+        if (stamina <= 0)
+        {
+            stamina = 0;
+        }
+
+        canDrainStamina = false;
+        yield return new WaitForSeconds(0.035f);
+        canDrainStamina = true;
+    }
+
+    private IEnumerator RefillStamina()
+    {
+        stamina++;
+
+        if (stamina >= staminaMax)
+        {
+            stamina = staminaMax;
+            isStaminaDelayComplete = false;
+        }
+        canRefillStamina = false;
+        yield return new WaitForSeconds(0.75f);
+        canRefillStamina = true;
+    }
+
+    private IEnumerator StaminaRefillDelay()
+    {
+        isStaminaDelayComplete = false;
+        yield return new WaitForSeconds(3.0f);
+        isStaminaDelayComplete = true;
+    }
+
+    private IEnumerator ReloadDelay()
+    {
+        canShoot = false;
+        yield return new WaitForSeconds(1.5f);
+        canShoot = true;
+    }
 }

@@ -7,26 +7,25 @@ public class EnemyAI : MonoBehaviour
 {
     private NavMeshAgent enemyAgent;
     private Animator enemyAnimator;
+    private PlayerHealth playerHealth;
 
-    public static bool isStalking;
     private bool isAlive = true;
+    public static bool isStalking;
 
-    // Health and Attack system
     public int maxHealth = 100;
-
     private int currentHealth;
+
+    private bool canAttack;
     public float attackRange = 2.0f;
     public int damageAmount = 10;
-    public float attackCooldown = 1.5f;
-    private float lastAttackTime;
 
     private void Start()
     {
         currentHealth = maxHealth;
         enemyAgent = GetComponent<NavMeshAgent>();
         enemyAnimator = GetComponentInChildren<Animator>();
-
-        isStalking = true;
+        playerHealth = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerHealth>();
+        canAttack = true;
     }
 
     private void Update()
@@ -71,32 +70,25 @@ public class EnemyAI : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!isStalking && other.CompareTag("Player"))
+        if (other.gameObject.name.Equals("Player"))
         {
-            isStalking = true;
+            if (!isStalking)
+            {
+                isStalking = true;
+            }
         }
     }
 
     private void OnTriggerStay(Collider other)
     {
-        if (other.CompareTag("Player"))
+        if (other.gameObject.name.Equals("Player"))
         {
-            if (Time.time >= lastAttackTime + attackCooldown)
+            if (canAttack && isAlive)
             {
-                AttackPlayer(other.gameObject);
-                lastAttackTime = Time.time;
+                canAttack = false;
+                AttackPlayer();
             }
-        }
-    }
-
-    private void OnTriggerExit(Collider other)
-    {
-        if (other.CompareTag("Player"))
-        {
-            isStalking = false;
-            enemyAnimator.SetBool("isWalking", false);
-            enemyAgent.ResetPath();
-        }
+        }        
     }
 
     public void TakeDamage(int damage)
@@ -110,13 +102,21 @@ public class EnemyAI : MonoBehaviour
         Destroy(gameObject, 3f);
     }
 
-    private void AttackPlayer(GameObject player)
+    private void AttackPlayer()
     {
-        PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
         if (playerHealth != null)
-        {
-            playerHealth.TakeDamage(damageAmount);
-            Debug.Log("Player took damage: " + damageAmount);
+        {            
+            enemyAnimator.SetTrigger("isAttacking");
+            StartCoroutine(AttackDelay());                              
         }
+    }
+
+    private IEnumerator AttackDelay()
+    {
+        yield return new WaitForSeconds(1.2f);
+        playerHealth.TakeDamage(damageAmount);
+        Debug.Log("Player took damage: " + damageAmount);
+        yield return new WaitForSeconds(1.4f);
+        canAttack = true;
     }
 }
