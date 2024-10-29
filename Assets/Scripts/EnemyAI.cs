@@ -5,66 +5,80 @@ using UnityEngine.AI;
 
 public class EnemyAI : MonoBehaviour
 {
-    public GameObject enemyDest;
     private NavMeshAgent enemyAgent;
     private Animator enemyAnimator;
-    public GameObject enemy;
 
     public static bool isStalking;
 
-    // Health system
+    // Health and Attack system
     public int maxHealth = 100;
+
     private int currentHealth;
+    public float attackRange = 2.0f;
+    public int damageAmount = 10;
+    public float attackCooldown = 1.5f;
+    private float lastAttackTime;
 
     private void Start()
     {
-        // Initialize health
         currentHealth = maxHealth;
-
-        // Cache components
         enemyAgent = GetComponent<NavMeshAgent>();
-        enemyAnimator = enemy.GetComponent<Animator>();
-
-        // Check for required components
-        if (enemyAgent == null)
-        {
-            Debug.LogError("NavMeshAgent component missing on " + gameObject.name);
-        }
-
-        if (enemyAnimator == null)
-        {
-            Debug.LogError("Animator component missing on " + enemy.name);
-        }
-
-        if (enemyDest == null)
-        {
-            Debug.LogError("Enemy destination not assigned!");
-        }
+        enemyAnimator = GetComponent<Animator>();
     }
 
     private void Update()
     {
-        // Set the animator parameter to control the animation
-        enemyAnimator.SetBool("isWalking", isStalking);
-
-        // Set destination only if stalking
         if (isStalking)
         {
-            enemyAgent.SetDestination(enemyDest.transform.position);
+            // Find the player by tag
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                float distanceToPlayer = Vector3.Distance(transform.position, player.transform.position);
+                if (distanceToPlayer > attackRange)
+                {
+                    enemyAgent.SetDestination(player.transform.position);
+                }
+                else
+                {
+                    enemyAgent.ResetPath(); // Stop moving when within attack range
+                }
+            }
         }
+
+        enemyAnimator.SetBool("isWalking", isStalking);
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        // Activate stalking only if the collider belongs to the player
         if (!isStalking && other.CompareTag("Player"))
         {
-            GetComponent<BoxCollider>().enabled = false;
             isStalking = true;
         }
     }
 
-    // Health system method
+    private void OnTriggerStay(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            if (Time.time >= lastAttackTime + attackCooldown)
+            {
+                AttackPlayer(other.gameObject);
+                lastAttackTime = Time.time;
+            }
+        }
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            isStalking = false;
+            enemyAnimator.SetBool("isWalking", false);
+            enemyAgent.ResetPath();
+        }
+    }
+
     public void TakeDamage(int damage)
     {
         currentHealth -= damage;
@@ -76,10 +90,18 @@ public class EnemyAI : MonoBehaviour
 
     private void Die()
     {
-        // Disable the enemy's movement and play the death animation
         enemyAgent.enabled = false;
-        enemyAnimator.SetTrigger("die"); 
+        enemyAnimator.SetTrigger("Die");
+        Destroy(gameObject, 2f);
+    }
 
-        Destroy(gameObject, 0.5f);
+    private void AttackPlayer(GameObject player)
+    {
+        PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
+        if (playerHealth != null)
+        {
+            playerHealth.TakeDamage(damageAmount);
+            Debug.Log("Player took damage: " + damageAmount);
+        }
     }
 }
