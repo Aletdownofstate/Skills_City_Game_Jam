@@ -161,7 +161,8 @@ public class PlayerController : MonoBehaviour
 
         if (Physics.Raycast(ray, out hit, shootRange, enemyLayer))
         {
-            // damage to enemy goes here.
+            EnemyAI enemy = hit.collider.GetComponentInChildren<EnemyAI>();
+            enemy.TakeDamage(100);
         }
     }
 

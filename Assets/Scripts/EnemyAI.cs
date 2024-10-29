@@ -9,6 +9,7 @@ public class EnemyAI : MonoBehaviour
     private Animator enemyAnimator;
 
     public static bool isStalking;
+    private bool isAlive = true;
 
     // Health and Attack system
     public int maxHealth = 100;
@@ -23,30 +24,49 @@ public class EnemyAI : MonoBehaviour
     {
         currentHealth = maxHealth;
         enemyAgent = GetComponent<NavMeshAgent>();
-        enemyAnimator = GetComponent<Animator>();
+        enemyAnimator = GetComponentInChildren<Animator>();
+
+        isStalking = true;
     }
 
     private void Update()
     {
-        if (isStalking)
+        if (currentHealth <= 0)
         {
-            // Find the player by tag
+            isAlive = false;
+            enemyAnimator.SetBool("isWalking", false);
+            enemyAnimator.SetTrigger("isDead");
+            Die();
+        }
+
+        if (enemyAgent.velocity.x != 0 || enemyAgent.velocity.y != 0)
+        {
+            enemyAnimator.SetBool("isWalking", true);
+        }
+        else
+        {
+            enemyAnimator.SetBool("isWalking", false);
+        }
+
+        if (isStalking && isAlive)
+        {
             GameObject player = GameObject.FindGameObjectWithTag("Player");
+
             if (player != null)
             {
                 float distanceToPlayer = Vector3.Distance(transform.position, player.transform.position);
+
                 if (distanceToPlayer > attackRange)
                 {
-                    enemyAgent.SetDestination(player.transform.position);
+                    enemyAgent.SetDestination(player.transform.position);                    
                 }
                 else
                 {
-                    enemyAgent.ResetPath(); // Stop moving when within attack range
+                    enemyAgent.ResetPath();
+                    enemyAnimator.SetBool("isWalking", false);
                 }
             }
-        }
-
-        enemyAnimator.SetBool("isWalking", isStalking);
+        }        
     }
 
     private void OnTriggerEnter(Collider other)
@@ -82,17 +102,12 @@ public class EnemyAI : MonoBehaviour
     public void TakeDamage(int damage)
     {
         currentHealth -= damage;
-        if (currentHealth <= 0)
-        {
-            Die();
-        }
     }
 
     private void Die()
-    {
+    {        
         enemyAgent.enabled = false;
-        enemyAnimator.SetTrigger("Die");
-        Destroy(gameObject, 2f);
+        Destroy(gameObject, 3f);
     }
 
     private void AttackPlayer(GameObject player)
