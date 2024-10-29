@@ -293,7 +293,7 @@ MonoBehaviour:
   muzzleFlash: {fileID: 7611805508487848706}
   enemyLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 64
   shootRange: 100
 --- !u!114 &7409414349069258238
 MonoBehaviour:
