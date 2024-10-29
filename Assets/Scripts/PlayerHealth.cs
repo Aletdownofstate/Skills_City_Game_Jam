@@ -8,24 +8,27 @@ public class PlayerHealth : MonoBehaviour
     public int playerMaxHp = 100;
 
     private void Start()
-    {        
-        playerHp = playerMaxHp;
-    }
-
-    private void Update()
     {
-        if (playerHp <= 0)
-        {
-            playerHp = 0;
-        }
-        if (playerHp >= playerMaxHp)
-        {
-            playerHp = playerMaxHp;
-        }
+        playerHp = playerMaxHp;
     }
 
     public void TakeDamage(int damage)
     {
         playerHp -= damage;
+        if (playerHp <= 0)
+        {
+            playerHp = 0;
+            Die();
+        }
+        else if (playerHp > playerMaxHp)
+        {
+            playerHp = playerMaxHp;
+        }
     }
+
+    private void Die()
+    {
+        Debug.Log("Player has died!");
+    }
+
 }
